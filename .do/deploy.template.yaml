@@ -13,7 +13,6 @@ spec:
     - key: SETUP_PASSWORD
       scope: RUN_TIME
       type: SECRET
-      value: elan
     - key: CLAWDBOT_STATE_DIR
       scope: RUN_AND_BUILD_TIME
       value: /data/.clawdbot
@@ -23,17 +22,15 @@ spec:
     - key: SPACES_ENDPOINT
       scope: RUN_AND_BUILD_TIME
       value: atl1.digitaloceanspaces.com
-    - key: XXXSPACES_BUCKET
+    - key: SPACES_BUCKET
       scope: RUN_AND_BUILD_TIME
-      value: clawdbot
+      type: SECRET
     - key: LITESTREAM_SECRET_ACCESS_KEY
       scope: RUN_AND_BUILD_TIME
       type: SECRET
-      value: xxx
     - key: LITESTREAM_ACCESS_KEY_ID
       scope: RUN_AND_BUILD_TIME
       type: SECRET
-      value: xxx
     - key: TS_ENABLE_HEALTH_CHECK
       scope: RUN_AND_BUILD_TIME
       value: "true"
@@ -43,7 +40,6 @@ spec:
     - key: TS_AUTHKEY
       scope: RUN_TIME
       type: SECRET
-      value: xxx
     - key: TS_USERSPACE
       scope: RUN_AND_BUILD_TIME
       value: "true"
@@ -54,9 +50,9 @@ spec:
       scope: RUN_AND_BUILD_TIME
       value: /tmp/tailscaled.sock
     github:
-      branch: elan
+      branch: main
       deploy_on_push: true
-      repo: ElanHasson/clawdbot-appplatform
+      repo: digitalocean-labs/clawdbot-appplatform
     instance_count: 1
     instance_size_slug: apps-s-2vcpu-4gb
     name: clawdbot

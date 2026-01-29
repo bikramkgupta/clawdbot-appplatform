@@ -1,45 +1,135 @@
-# Moltbot App Platform Image
+# Clawdbot on DigitalOcean App Platform
 
-Pre-built Docker image for deploying [Moltbot](https://github.com/moltbot/moltbot) on DigitalOcean App Platform with Tailscale networking.
+Your personal AI assistant, privately accessible via Tailscale.
 
-[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/digitalocean-labs/moltbot-appplatform/tree/main)
+[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/digitalocean-labs/clawdbot-appplatform/tree/main)
 
-## Features
+> **Note**: Clawdbot runs as a worker (no public URL) — accessible only through your private Tailscale network.
 
-- **Fast boot** (~30 seconds vs 5-10 min source build)
-- **Private networking** via Tailscale - secure access without public exposure
-- **Optional persistence** via Litestream + DO Spaces
-- **Gradient AI support** - Use DigitalOcean's serverless AI inference
-- **SSH access** - Optional SSH server for remote access
-- **Multi-arch** support (amd64/arm64)
-- **s6-overlay** - Proper process supervision with drop-in customization
+## How It Works
 
-## Quick Start
+```mermaid
+flowchart LR
+    subgraph Tailnet["Your Tailscale Network"]
+        user["Your Devices<br/>Laptop / Phone"]
+    end
+
+    subgraph DO["DigitalOcean App Platform"]
+        clawdbot["Clawdbot<br/>Worker"]
+    end
+
+    subgraph Channels["Messaging"]
+        telegram["Telegram"]
+        whatsapp["WhatsApp"]
+    end
+
+    subgraph AI["AI Providers"]
+        anthropic["Claude"]
+        gradient["Gradient"]
+    end
+
+    user <-->|"Private Access<br/>100.x.y.z"| clawdbot
+    clawdbot <--> Channels
+    clawdbot <--> AI
+```
+
+## Prerequisites
+
+Before deploying, you'll need:
+
+| Prerequisite | Why Needed | Setup |
+|--------------|------------|-------|
+| **Tailscale Account** | Clawdbot is your personal assistant with access to your accounts. Tailscale ensures only you can access it — no public exposure. | See [tailscale.md](tailscale.md) |
+| **DO Spaces Bucket** | App Platform has no persistent storage. Spaces backs up your config, sessions, and Tailscale identity so they survive restarts. | DigitalOcean Dashboard → Spaces → Create |
+| **AI Provider API Key** | At least one AI provider (Anthropic, OpenAI, or Gradient) for the assistant brain. | Provider dashboard |
+
+## Deployment Options
+
+Choose your preferred deployment method:
+
+### Option 1: One-Click Deploy (Recommended)
+
+The fastest way to get started.
 
 1. Click the **Deploy to DO** button above
-2. Set required environment variables (see below)
-3. Wait for deployment (~1 minute)
-4. Access via `https://moltbot.<your-tailnet>.ts.net`
+2. Fill in the required secrets when prompted:
+   - `TS_AUTHKEY` — Tailscale auth key (see [tailscale.md](tailscale.md))
+   - `SETUP_PASSWORD` — Password for the web setup wizard
+3. (Recommended) Add Spaces credentials for persistence
+4. Deploy and wait for build to complete
+5. Access via `https://clawdbot.<your-tailnet>.ts.net` from any Tailscale device
+6. Complete setup wizard and configure your first channel
+
+### Option 2: CLI Deploy with doctl
+
+Deploy using the DigitalOcean CLI with full control over configuration.
+
+```bash
+# Clone the repo
+git clone https://github.com/digitalocean-labs/clawdbot-appplatform
+cd clawdbot-appplatform
+
+# Edit app.yaml with your preferences (region, instance size, etc.)
+vim app.yaml
+
+# Create the app
+doctl apps create --spec app.yaml
+
+# Set secrets via CLI or dashboard
+doctl apps update <app-id> --set-env TS_AUTHKEY=tskey-auth-xxx
+doctl apps update <app-id> --set-env SETUP_PASSWORD=your-password
+```
+
+### Option 3: CI/CD Deploy via GitHub Actions
+
+Deploy from your fork using GitHub Actions (manual trigger only).
+
+1. Fork this repository
+2. Add secrets to your fork (Settings → Secrets → Actions):
+   - `DIGITALOCEAN_ACCESS_TOKEN` — [Create API token](https://cloud.digitalocean.com/account/api/tokens)
+3. Go to Actions → "Deploy to App Platform" → Run workflow
+4. The workflow uses `.do/deploy.template.yaml` for configuration
+
+```yaml
+# Required GitHub Secrets:
+DIGITALOCEAN_ACCESS_TOKEN  # DO API token with read/write App Platform access
+```
+
+> **Note**: The deployment workflow is manual-only (`workflow_dispatch`) — it won't trigger automatically on push.
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                     moltbot-appplatform                          │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │ s6-overlay - Process supervision and init system            ││
-│  └─────────────────────────────────────────────────────────────┘│
-│  ┌─────────────┐  ┌───────────┐  ┌──────────────────────────┐   │
-│  │ Ubuntu      │  │ Moltbot   │  │ Litestream (optional)    │   │
-│  │ Noble+Node  │  │ (latest)  │  │ SQLite → DO Spaces       │   │
-│  └─────────────┘  └───────────┘  └──────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │ Tailscale - Private networking via tailnet (required)      ││
-│  └─────────────────────────────────────────────────────────────┘│
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │ SSH Server (optional) - Remote access via ENABLE_SSH=true  ││
-│  └─────────────────────────────────────────────────────────────┘│
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Tailnet["Your Tailscale Network (Private)"]
+        laptop["Laptop<br/>(Tailscale)"]
+        phone["Phone<br/>(Tailscale)"]
+
+        subgraph DO["DigitalOcean App Platform"]
+            subgraph Worker["Clawdbot Worker Container"]
+                entry["entrypoint.sh<br/>(init + backup)"]
+                ts["Tailscale<br/>containerboot"]
+                gw["Clawdbot<br/>Gateway"]
+                litestream["Litestream<br/>(SQLite sync)"]
+            end
+        end
+    end
+
+    subgraph Spaces["DO Spaces (S3)"]
+        state["clawdbot/state-backup.tar.gz"]
+        db["clawdbot/memory-main/"]
+    end
+
+    laptop <-->|"WireGuard<br/>100.x.y.z"| ts
+    phone <-->|"WireGuard"| ts
+    ts <--> gw
+    entry --> ts
+    entry --> gw
+    litestream --> db
+    entry -->|"periodic"| state
+
+    style Worker fill:#c8e6c9,stroke:#2e7d32
+    style Tailnet fill:#e3f2fd,stroke:#1565c0
 ```
 
 ## Environment Variables
@@ -48,219 +138,125 @@ Pre-built Docker image for deploying [Moltbot](https://github.com/moltbot/moltbo
 
 | Variable | Description |
 |----------|-------------|
-| `TS_AUTHKEY` | Tailscale auth key for joining your tailnet |
+| `TS_AUTHKEY` | Tailscale auth key (see [tailscale.md](tailscale.md)) |
 | `SETUP_PASSWORD` | Password for the web setup wizard |
 
-### Recommended
+### Recommended (Persistence)
 
-| Variable | Description |
-|----------|-------------|
-| `TS_HOSTNAME` | Hostname on your tailnet (default: container hostname) |
-| `MOLTBOT_GATEWAY_TOKEN` | Admin token for gateway API access |
-
-### Optional (SSH)
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ENABLE_SSH` | Start SSH server on port 22 | `false` |
-
-### Optional (Gradient AI)
-
-| Variable | Description |
-|----------|-------------|
-| `GRADIENT_API_KEY` | DigitalOcean Gradient AI Model Access Key |
-
-When set, adds Gradient as a model provider with access to:
-- Llama 3.3 70B Instruct
-- Claude 4.5 Sonnet
-- Claude Opus 4.5
-- DeepSeek R1 Distill Llama 70B
-
-### Optional (Persistence)
-
-Without these, the app runs in ephemeral mode - state is lost on redeploy.
+Without these, state is lost on redeploy.
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `LITESTREAM_ACCESS_KEY_ID` | DO Spaces access key | |
-| `LITESTREAM_SECRET_ACCESS_KEY` | DO Spaces secret key | |
-| `SPACES_ENDPOINT` | Spaces endpoint | `tor1.digitaloceanspaces.com` |
-| `SPACES_BUCKET` | Spaces bucket name | `my-moltbot-backup` |
+| `LITESTREAM_ACCESS_KEY_ID` | Spaces access key | |
+| `LITESTREAM_SECRET_ACCESS_KEY` | Spaces secret key | |
+| `SPACES_ENDPOINT` | Spaces region endpoint | `tor1.digitaloceanspaces.com` |
+| `SPACES_BUCKET` | Your bucket name | `clawdbot-backup` |
+
+### Optional
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TS_HOSTNAME` | Hostname on your tailnet | `clawdbot` |
+| `CLAWDBOT_GATEWAY_TOKEN` | Admin token for gateway API | (generated) |
+| `GRADIENT_API_KEY` | DigitalOcean Gradient AI access | — |
+
+#### Gradient AI Models
+
+When `GRADIENT_API_KEY` is set, you get access to:
+- Llama 3.3 70B Instruct
+- Claude 4.5 Sonnet / Opus 4.5
+- DeepSeek R1 Distill Llama 70B
+
+## Configuring Channels
+
+After deployment, access the web UI at `https://clawdbot.<your-tailnet>.ts.net` and configure channels.
+
+### Telegram (Recommended First Channel)
+
+1. Create a bot via [@BotFather](https://t.me/BotFather) and get your token
+2. In Clawdbot settings, add the Telegram channel with your bot token
+3. Configure DM policy: **pairing** (approve via code) or **allowlist** (specific users only)
+4. Start chatting with your bot
+
+### WhatsApp
+
+1. Access the Clawdbot web console
+2. Run `clawdbot channels login whatsapp`
+3. Scan the QR code with WhatsApp → Linked Devices
+4. Configure allowlist with your phone number
+
+### Other Channels
+
+Clawdbot supports Discord, Slack, Matrix, Signal, and more. See the [Clawdbot documentation](https://docs.clawdbot.com) for setup guides.
+
+## How Backup Works
+
+The container uses two backup mechanisms:
+
+| Data | Method | Frequency |
+|------|--------|-----------|
+| SQLite (memory/search index) | Litestream | Real-time (~1s) |
+| Config, sessions, JSON state | s3cmd tar | Every 5 minutes |
+
+**On startup:**
+1. Restores JSON state from Spaces (if exists)
+2. Restores SQLite via Litestream (if exists)
+3. Starts Tailscale daemon
+4. Starts the gateway
+
+**On shutdown:**
+Final backup is triggered on SIGTERM for graceful restarts.
 
 ## Resource Requirements
 
-| Resource | Value |
-|----------|-------|
-| CPU | 1 shared vCPU |
-| RAM | 2 GB |
-| Instance | `apps-s-1vcpu-2gb` |
-| Cost | ~$25/mo (+ $5/mo Spaces optional) |
+| Instance | RAM | Use Case | Cost |
+|----------|-----|----------|------|
+| `apps-s-1vcpu-2gb` | 2 GB | Minimum viable | ~$25/mo |
+| `apps-s-2vcpu-4gb` | 4 GB | Recommended (default) | ~$48/mo |
 
-> **Note:** The gateway requires 2GB RAM to start reliably. Using `basic-xs` (1GB) will result in OOM errors.
+> **Note**: Resource needs scale with channels, agents, and features. The default 4GB is recommended for reliable operation.
+
+Add ~$5/mo for Spaces persistence.
 
 ## Available Regions
 
-- `nyc` - New York
-- `ams` - Amsterdam
-- `sfo` - San Francisco
-- `sgp` - Singapore
-- `lon` - London
-- `fra` - Frankfurt
-- `blr` - Bangalore
-- `syd` - Sydney
-- `tor` - Toronto (default)
+| Region | Code |
+|--------|------|
+| New York | `nyc` |
+| Amsterdam | `ams` |
+| San Francisco | `sfo` |
+| Singapore | `sgp` |
+| London | `lon` |
+| Frankfurt | `fra` |
+| Bangalore | `blr` |
+| Sydney | `syd` |
+| Toronto | `tor` (default) |
 
 Edit the `region` field in `app.yaml` to change.
 
-## Manual Deployment
-
-```bash
-# Clone and deploy
-git clone https://github.com/digitalocean-labs/moltbot-appplatform
-cd moltbot-appplatform
-
-# Validate spec
-doctl apps spec validate app.yaml
-
-# Create app
-doctl apps create --spec app.yaml
-
-# Set secrets in the DO dashboard
-```
-
-## Customizing the Image
-
-The `rootfs/` directory allows you to add or override any files in the container. Files are copied to `/` at the end of the Docker build.
-
-This image uses [s6-overlay](https://github.com/just-containers/s6-overlay) for process supervision, which provides two ways to add custom logic:
-
-### Directory Structure
+## File Structure
 
 ```
-rootfs/
-├── etc/
-│   ├── cont-init.d/               # One-time initialization scripts
-│   │   └── 30-my-setup            # Runs once at startup
-│   ├── services.d/                # Long-running services (supervised)
-│   │   └── my-daemon/
-│   │       └── run                # Daemon start script
-│   ├── ssh/
-│   │   └── sshd_config.d/
-│   │       └── 10-custom.conf     → /etc/ssh/sshd_config.d/10-custom.conf
-│   └── motd                        → /etc/motd
-└── home/
-    └── moltbot/
-        └── .bashrc                 → /home/moltbot/.bashrc
+├── .do/
+│   └── deploy.template.yaml  # App Platform deploy button config
+├── .github/
+│   └── workflows/
+│       ├── build-push.yml    # Build & push to GHCR (weekly)
+│       └── deploy.yml        # Manual deploy to App Platform
+├── app.yaml                  # CLI deployment spec
+├── Dockerfile                # Container image definition
+├── entrypoint.sh             # Container init & backup logic
+├── litestream.yml            # SQLite replication config
+├── tailscale                 # Tailscale CLI wrapper
+└── tailscale.md              # Tailscale setup guide
 ```
 
-### Initialization Scripts (`cont-init.d`)
+## Links
 
-One-time scripts that run at container startup before services start. Scripts run in alphanumeric order.
-
-**Example:** `rootfs/etc/cont-init.d/30-install-tools`
-
-```bash
-#!/command/with-contenv bash
-# Install additional tools
-apt-get update && apt-get install -y vim htop
-```
-
-**Notes:**
-- Use `#!/command/with-contenv bash` to inherit environment variables
-- Scripts run as root
-- Built-in scripts use `10-` and `20-` prefixes; use `30-` or higher for custom scripts
-
-### Custom Services (`services.d`)
-
-Long-running daemons that s6 supervises and restarts if they crash.
-
-**Example:** `rootfs/etc/services.d/my-daemon/run`
-
-```bash
-#!/command/with-contenv bash
-exec my-daemon --foreground
-```
-
-**Notes:**
-- The `run` script must `exec` the daemon (not fork to background)
-- s6 automatically restarts the service if it exits
-- Add a `finish` script for cleanup on shutdown
-- Add a `down` file to disable the service by default
-
-### Built-in Services
-
-| Service | Description |
-|---------|-------------|
-| `tailscale` | Tailscale daemon (required) |
-| `moltbot` | Moltbot gateway |
-| `sshd` | SSH server (if `ENABLE_SSH=true`) |
-| `backup` | Periodic state backup (if persistence configured) |
-
-### General Notes
-
-- Files are copied with `COPY rootfs/ /` which preserves directory structure
-- Existing files in the container will be overwritten
-- File permissions from the source are preserved
-
-## Setting Up Persistence
-
-App Platform doesn't have persistent volumes, so this image uses DO Spaces for state backup.
-
-### What Gets Persisted
-
-| Data Type | Backup Method | Description |
-|-----------|--------------|-------------|
-| Memory search index | Litestream (real-time) | SQLite database for vector search |
-| Config, devices, sessions | S3 backup (every 5 min) | JSON state files |
-| Tailscale state | S3 backup (every 5 min) | Auth keys and node identity |
-
-### Setup Steps
-
-1. **Create a Spaces bucket** in the same region as your app
-   - Go to **Spaces Object Storage** → **Create Bucket**
-   - Name: e.g., `moltbot-backup`
-   - Region: match your app (e.g., `tor1` for Toronto)
-
-2. **Create Spaces access keys**
-   - Go to **Settings → API → Spaces Keys**
-   - Click **Generate New Key**
-   - Save both Access Key and Secret Key
-
-3. **Add environment variables** to your App Platform app:
-   - `LITESTREAM_ACCESS_KEY_ID` = your access key
-   - `LITESTREAM_SECRET_ACCESS_KEY` = your secret key
-   - `SPACES_ENDPOINT` = `<region>.digitaloceanspaces.com` (e.g., `tor1.digitaloceanspaces.com`)
-   - `SPACES_BUCKET` = your bucket name
-
-4. **Redeploy** the app
-
-### How It Works
-
-On startup:
-1. Restores JSON state backup from Spaces (if exists)
-2. Restores Tailscale state from Spaces (if exists)
-3. Restores SQLite memory database via Litestream (if exists)
-4. Starts the gateway
-
-During operation:
-- Litestream continuously replicates SQLite changes (1s sync interval)
-- JSON state and Tailscale state are backed up every 5 minutes
-- On graceful shutdown (SIGTERM), final state backup is saved
-
-## Tailscale Setup
-
-Tailscale is required for networking. To set up:
-
-1. Create a Tailscale auth key at https://login.tailscale.com/admin/settings/keys
-2. Set `TS_AUTHKEY` environment variable
-3. Optionally set `TS_HOSTNAME` for a custom hostname
-4. Deploy as a **worker** (use `.do/deploy.template.yaml`)
-5. Access via `https://moltbot.<your-tailnet>.ts.net`
-
-## Documentation
-
-- [Full deployment guide](https://docs.molt.bot/digitalocean)
-- [Moltbot documentation](https://docs.molt.bot)
+- [Clawdbot Documentation](https://docs.clawdbot.com)
+- [Tailscale Setup Guide](tailscale.md)
+- [Tailscale Getting Started](https://tailscale.com/kb/1017/install/)
+- [App Platform Documentation](https://docs.digitalocean.com/products/app-platform/)
 
 ## License
 

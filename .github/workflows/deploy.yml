@@ -1,0 +1,36 @@
+name: Deploy to App Platform
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  APP_NAME: clawdbot
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to DigitalOcean App Platform
+        uses: digitalocean/app_action@v1.1.5
+        with:
+          app_name: ${{ env.APP_NAME }}
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          # Uses .do/deploy.template.yaml by default, or specify:
+          # app_spec_location: .do/deploy.template.yaml
+
+      - name: Get deployment URL
+        run: |
+          echo "Deployment triggered for app: ${{ env.APP_NAME }}"
+          echo "View in DigitalOcean console: https://cloud.digitalocean.com/apps"
