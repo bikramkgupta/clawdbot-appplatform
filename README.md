@@ -51,8 +51,19 @@ Choose your preferred deployment method:
 
 The fastest way to get started.
 
+> **Tip: Bulk Import Environment Variables**
+>
+> There are many environment variables to configure. To save time:
+> 1. Copy `.env.example` to `.env` and fill in your values
+> 2. Click the **Deploy to DO** button
+> 3. Scroll to the Environment Variables section
+> 4. Click **Bulk Import** (instead of adding one by one)
+> 5. Paste all your env vars from your `.env` file
+>
+> This is much faster than entering each variable individually.
+
 1. Click the **Deploy to DO** button above
-2. Fill in the required secrets when prompted:
+2. Fill in the required secrets when prompted (or use Bulk Import as described above):
    - `TS_AUTHKEY` — Tailscale auth key (see [tailscale.md](tailscale.md))
    - `SETUP_PASSWORD` — Password for the web setup wizard
 3. (Recommended) Add Spaces credentials for persistence
@@ -189,6 +200,43 @@ After deployment, access the web UI at `https://clawdbot.<your-tailnet>.ts.net` 
 
 Clawdbot supports Discord, Slack, Matrix, Signal, and more. See the [Clawdbot documentation](https://docs.clawdbot.com) for setup guides.
 
+## Accessing Clawdbot After Deployment
+
+Once deployed, access Clawdbot via your Tailscale network.
+
+### SSH Access
+
+1. **Enable Tailscale SSH** (one-time, via DO console or SDK):
+   ```bash
+   tailscale set --ssh
+   ```
+
+2. **Update Tailscale ACL** to allow SSH (see [tailscale.md](tailscale.md#example-complete-acl-policy))
+
+3. **Connect from any Tailscale device**:
+   ```bash
+   ssh clawdbot@<hostname>.<your-tailnet>.ts.net
+   ```
+
+### Browser Access (Control UI)
+
+**Option 1: SSH Tunnel (Recommended)**
+```bash
+# Forward local port 8080 to the gateway
+ssh -L 8080:localhost:18789 clawdbot@<hostname>.<your-tailnet>.ts.net
+
+# Then open: http://localhost:8080
+```
+
+**Option 2: Tailscale Serve**
+```bash
+# Inside the container (via SSH)
+tailscale serve --bg 18789
+
+# Requires approval at the URL shown, then access:
+# https://<hostname>.<your-tailnet>.ts.net
+```
+
 ## How Backup Works
 
 The container uses two backup mechanisms:
@@ -244,6 +292,7 @@ Edit the `region` field in `app.yaml` to change.
 │   └── workflows/
 │       ├── build-push.yml    # Build & push to GHCR (weekly)
 │       └── deploy.yml        # Manual deploy to App Platform
+├── .env.example              # Template for environment variables (copy to .env)
 ├── app.yaml                  # CLI deployment spec
 ├── Dockerfile                # Container image definition
 ├── entrypoint.sh             # Container init & backup logic

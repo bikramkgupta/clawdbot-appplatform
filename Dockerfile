@@ -8,6 +8,7 @@ COPY --from=tailscale /usr/local/bin/tailscaled /usr/local/bin/tailscaled
 COPY --from=tailscale /usr/local/bin/containerboot /usr/local/bin/containerboot
 
 COPY tailscale /usr/local/bin/tailscale
+RUN chmod +x /usr/local/bin/tailscale
 
 ARG TARGETARCH=x86_64
 ARG CLAWDBOT_VERSION=latest

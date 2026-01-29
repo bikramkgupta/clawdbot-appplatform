@@ -85,62 +85,69 @@ Add this to your access control policy:
 
 Replace `your-email@example.com` with your Tailscale login email.
 
-### Example: Allow SSH Access
+### Example: Complete ACL Policy
 
-If you want SSH access to Clawdbot for debugging:
-
-```json
-{
-  "tagOwners": {
-    "tag:clawdbot": ["autogroup:admin"]
-  },
-  "ssh": [
-    {
-      "action": "accept",
-      "src": ["autogroup:member"],
-      "dst": ["tag:clawdbot"],
-      "users": ["root", "clawdbot"]
-    }
-  ],
-  "acls": [
-    {
-      "action": "accept",
-      "src": ["your-email@example.com"],
-      "dst": ["tag:clawdbot:22", "tag:clawdbot:443"]
-    }
-  ]
-}
-```
-
-### Complete Example Policy
-
-Here's a full policy that allows:
-- SSH access to tagged devices
-- HTTP/HTTPS access to Clawdbot
-- Members to reach clawdbot-tagged devices
+Here's a working policy that allows SSH and HTTP access to tagged devices:
 
 ```json
 {
-  "tagOwners": {
-    "tag:clawdbot": ["autogroup:admin"]
-  },
-  "ssh": [
-    {
-      "action": "accept",
-      "src": ["autogroup:member"],
-      "dst": ["tag:clawdbot"],
-      "users": ["root", "clawdbot"]
-    }
-  ],
-  "acls": [
-    {
-      "action": "accept",
-      "src": ["autogroup:member"],
-      "dst": ["tag:clawdbot:*"]
-    }
-  ]
+    "grants": [
+        {
+            "src": ["*"],
+            "dst": ["*"],
+            "ip":  ["*"]
+        }
+    ],
+    "tagOwners": {
+        "tag:clawdbot": ["autogroup:admin"]
+    },
+    "ssh": [
+        {
+            "action": "accept",
+            "src":    ["autogroup:member"],
+            "dst":    ["tag:clawdbot"],
+            "users":  ["*"]
+        }
+    ],
+    "acls": [
+        {
+            "action": "accept",
+            "src":    ["autogroup:member"],
+            "dst":    ["tag:clawdbot:22", "tag:clawdbot:8080", "tag:clawdbot:18789"]
+        }
+    ],
+    "nodeAttrs": [
+        {
+            "target": ["autogroup:member"],
+            "attr":   ["funnel"]
+        }
+    ]
 }
 ```
+
+**Key points:**
+- `"users": ["*"]` allows SSH as any user (root, clawdbot, etc.)
+- Port 18789 is the Clawdbot gateway
+- `tag:clawdbot` should match your `TS_AUTHKEY` tag
+
+### Enabling SSH in the Container
+
+Tailscale SSH must be enabled inside the container after deployment:
+
+1. **Via DO App Platform Console** (doctl or web console):
+   ```bash
+   doctl apps console <app-id> <component>
+   # Then run: tailscale set --ssh
+   ```
+
+2. **Via SDK** (for automation):
+   ```python
+   from do_app_sandbox import Sandbox
+   app = Sandbox.get_from_id(app_id="<app-id>", component="clawdbot")
+   app.exec("tailscale set --ssh")
+   ```
+
+After enabling, verify in Tailscale Admin Console — the machine should show an "SSH" badge.
 
 ## Connecting Your Devices
 
