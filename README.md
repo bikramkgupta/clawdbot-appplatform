@@ -40,7 +40,7 @@ Before deploying, you'll need:
 | Prerequisite | Why Needed | Setup |
 |--------------|------------|-------|
 | **Tailscale Account** | Clawdbot is your personal assistant with access to your accounts. Tailscale ensures only you can access it — no public exposure. | See [tailscale.md](tailscale.md) |
-| **DO Spaces Bucket** | App Platform has no persistent storage. Spaces backs up your config, sessions, and Tailscale identity so they survive restarts. | DigitalOcean Dashboard → Spaces → Create |
+| **DO Spaces Bucket** | App Platform has no persistent storage. Spaces backs up your config, sessions, and Tailscale identity so they survive restarts. | See [spaces.md](spaces.md) |
 | **AI Provider API Key** | At least one AI provider (Anthropic, OpenAI, or Gradient) for the assistant brain. | Provider dashboard |
 
 ## Deployment Options
@@ -248,13 +248,15 @@ Edit the `region` field in `app.yaml` to change.
 ├── entrypoint.sh             # Container init & backup logic
 ├── litestream.yml            # SQLite replication config
 ├── tailscale                 # Tailscale CLI wrapper
-└── tailscale.md              # Tailscale setup guide
+├── tailscale.md              # Tailscale setup guide
+└── spaces.md                 # DO Spaces setup guide
 ```
 
 ## Links
 
 - [Clawdbot Documentation](https://docs.clawdbot.com)
 - [Tailscale Setup Guide](tailscale.md)
+- [DO Spaces Setup Guide](spaces.md)
 - [Tailscale Getting Started](https://tailscale.com/kb/1017/install/)
 - [App Platform Documentation](https://docs.digitalocean.com/products/app-platform/)
 
